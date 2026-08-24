@@ -63,6 +63,22 @@ export const isURLMentionable = ({
       return hostname === "gitlab.com" || hostname === gitlabHostname;
     }
 
+    case IntegrationService.Plane: {
+      const settings =
+        integration.settings as IntegrationSettings<IntegrationType.Embed>;
+      let planeHostname: string | undefined;
+      try {
+        planeHostname = settings.plane?.url
+          ? new URL(settings.plane.url).hostname
+          : undefined;
+      } catch {
+        // Invalid URL stored in settings
+        return false;
+      }
+
+      return hostname === planeHostname;
+    }
+
     default:
       return false;
   }
@@ -127,6 +143,26 @@ export const determineMentionType = ({
           return MentionType.Project;
         }
       }
+      return undefined;
+    }
+
+    case IntegrationService.Plane: {
+      const type = pathParts[2];
+
+      if (type === "projects") {
+        const projectId = pathParts[3];
+        if (projectId && pathParts[4] === "issues" && pathParts[5]) {
+          return MentionType.Issue;
+        }
+        if (projectId) {
+          return MentionType.Project;
+        }
+      }
+
+      if (type === "browse" && pathParts[3]) {
+        return MentionType.Issue;
+      }
+
       return undefined;
     }
 

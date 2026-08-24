@@ -10,6 +10,7 @@ import HoverPreviewsExtension from "~/editor/extensions/HoverPreviews";
 import Keys from "~/editor/extensions/Keys";
 import MentionMenuExtension from "~/editor/extensions/MentionMenu";
 import PasteHandler from "~/editor/extensions/PasteHandler";
+import PluginCommandRange from "~/editor/extensions/PluginCommandRange";
 import PreventTab from "~/editor/extensions/PreventTab";
 import SelectionToolbarExtension from "~/editor/extensions/SelectionToolbar";
 import SmartText from "~/editor/extensions/SmartText";
@@ -30,6 +31,7 @@ export const withUIExtensions = (nodes: Nodes) => [
   SelectionToolbarExtension,
   CommentGutterExtension,
   DiagramsExtension,
+  PluginCommandRange,
   // Order these default key handlers last
   PreventTab,
   Keys,

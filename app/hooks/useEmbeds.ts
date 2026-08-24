@@ -6,6 +6,7 @@ import { IntegrationType, TeamPreference } from "@shared/types";
 import type Integration from "~/models/Integration";
 import Logger from "~/utils/Logger";
 import useCurrentTeam from "./useCurrentTeam";
+import { mergePluginEmbeds, usePluginEmbeds } from "./usePluginEmbeds";
 import useStores from "./useStores";
 
 /**
@@ -17,6 +18,7 @@ import useStores from "./useStores";
 export default function useEmbeds(loadIfMissing = false) {
   const { integrations } = useStores();
   const team = useCurrentTeam({ rejectOnEmpty: false });
+  const pluginEmbeds = usePluginEmbeds();
 
   useEffect(() => {
     async function fetchEmbedIntegrations() {
@@ -39,7 +41,7 @@ export default function useEmbeds(loadIfMissing = false) {
 
   return useMemo(
     () =>
-      embeds.map((e) => {
+      mergePluginEmbeds(embeds, pluginEmbeds).map((e) => {
         // Find any integrations that match this embed and inject the settings
         const integration: Integration<IntegrationType.Embed> | undefined =
           find(integrations.orderedData, (i) => i.service === e.name);
@@ -53,6 +55,6 @@ export default function useEmbeds(loadIfMissing = false) {
         return e;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [integrations.orderedData, team?.preferences]
+    [integrations.orderedData, team?.preferences, pluginEmbeds]
   );
 }

@@ -10,16 +10,20 @@ import Heading from "~/components/Heading";
 import Switch from "~/components/Switch";
 import Text from "~/components/Text";
 import useCurrentTeam from "~/hooks/useCurrentTeam";
+import { mergePluginEmbeds, usePluginEmbeds } from "~/hooks/usePluginEmbeds";
 import { IntegrationScene } from "./components/IntegrationScene";
 import SettingRow from "./components/SettingRow";
 import { HStack } from "~/components/primitives/HStack";
 
-/** List of embed providers available for configuration. */
-const providers = embeds.filter((e) => e.id !== "embed");
-
 function Embeds() {
   const team = useCurrentTeam();
   const { t } = useTranslation();
+  const pluginEmbeds = usePluginEmbeds();
+
+  /** List of embed providers available for configuration. */
+  const providers = mergePluginEmbeds(embeds, pluginEmbeds).filter(
+    (e) => e.id !== "embed"
+  );
 
   const showSuccessMessage = React.useMemo(
     () =>
@@ -74,7 +78,7 @@ function Embeds() {
         preferences: { ...team.preferences },
       });
     },
-    [team, saveData]
+    [team, saveData, providers]
   );
 
   const disabledEmbeds =

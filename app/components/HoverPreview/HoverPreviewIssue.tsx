@@ -24,17 +24,20 @@ import {
 type Props = Omit<UnfurlResponse[UnfurlResourceType.Issue], "type">;
 
 const HoverPreviewIssue = React.forwardRef(function HoverPreviewIssue_(
-  { url, id, title, description, author, labels, state, createdAt }: Props,
+  { url, id, title, description, author, labels, state, createdAt, service }: Props,
   ref: React.Ref<HTMLDivElement>
 ) {
   const authorName = author.name;
   const urlObj = new URL(url);
-  const service =
-    urlObj.hostname === "linear.app"
+  // Prefer the service reported by the unfurl provider, falling back to
+  // hostname sniffing for cached payloads written before the field existed.
+  const resolvedService =
+    service ??
+    (urlObj.hostname === "linear.app"
       ? IntegrationService.Linear
       : urlObj.hostname === "github.com"
         ? IntegrationService.GitHub
-        : IntegrationService.GitLab;
+        : IntegrationService.GitLab);
 
   return (
     <Preview as="a" href={url} target="_blank" rel="noopener noreferrer">
@@ -44,7 +47,7 @@ const HoverPreviewIssue = React.forwardRef(function HoverPreviewIssue_(
             <Flex gap={2} column>
               <Title>
                 <StyledIssueStatusIcon
-                  service={service}
+                  service={resolvedService}
                   state={state}
                   size={18}
                 />

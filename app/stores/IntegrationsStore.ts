@@ -41,6 +41,12 @@ class IntegrationsStore extends Store<Integration> {
       (integration) => integration.service === IntegrationService.Linear
     );
   }
+  @computed
+  get plane(): Integration<IntegrationType.Embed>[] {
+    return this.orderedData.filter(
+      (integration) => integration.service === IntegrationService.Plane
+    );
+  }
 }
 
 export default IntegrationsStore;

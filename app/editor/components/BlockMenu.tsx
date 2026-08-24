@@ -8,8 +8,10 @@ import type { MenuItem } from "@shared/editor/types";
 import { ProsemirrorHelper } from "@shared/utils/ProsemirrorHelper";
 import { TextHelper } from "@shared/utils/TextHelper";
 import useCurrentUser from "~/hooks/useCurrentUser";
+import { useEditorCommands } from "~/hooks/useEditorCommands";
 import useStores from "~/hooks/useStores";
 import getMenuItems from "../menus/block";
+import { buildPluginBlockItems } from "../menus/pluginCommands";
 import { useEditor } from "./EditorContext";
 import type { Props as SuggestionsMenuProps } from "./SuggestionsMenu";
 import SuggestionsMenu from "./SuggestionsMenu";
@@ -108,18 +110,26 @@ type Props = Omit<SuggestionsMenuProps, "renderMenuItem" | "items"> &
 
 function BlockMenu(props: Props) {
   const { t } = useTranslation();
-  const { elementRef } = useEditor();
+  const editor = useEditor();
+  const { elementRef } = editor;
   const templateMenuItem = useTemplateMenuItem();
+  const pluginGroups = useEditorCommands("block");
 
   const items = useMemo(() => {
     const baseItems = getMenuItems(t, elementRef);
+    const menuItems = [...baseItems];
 
-    if (!templateMenuItem) {
-      return baseItems;
+    if (templateMenuItem) {
+      menuItems.push({ name: "separator" } as MenuItem, templateMenuItem);
     }
 
-    return [...baseItems, { name: "separator" } as MenuItem, templateMenuItem];
-  }, [t, elementRef, templateMenuItem]);
+    const pluginItems = buildPluginBlockItems(pluginGroups, editor, t);
+    if (pluginItems.length) {
+      menuItems.push({ name: "separator" } as MenuItem, ...pluginItems);
+    }
+
+    return menuItems;
+  }, [t, elementRef, templateMenuItem, pluginGroups, editor]);
 
   const renderMenuItem = useCallback(
     (item, _index, options) => (

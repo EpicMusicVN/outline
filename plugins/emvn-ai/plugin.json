@@ -1,0 +1,6 @@
+{
+  "id": "emvn-ai",
+  "name": "EMVN AI",
+  "priority": 30,
+  "description": "Adds selection-scoped AI editor commands backed by an agent on EMVN Agent Hub."
+}
