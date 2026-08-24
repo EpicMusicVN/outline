@@ -330,17 +330,22 @@ export const MentionIssue = observer((props: IssuePrProps) => {
 
   const issue = unfurl as UnfurlResponse[UnfurlResourceType.Issue];
 
-  let service = IntegrationService.GitLab;
-  try {
-    const parsedUrl = new URL(issue.url);
-    service =
-      parsedUrl.hostname === "github.com"
-        ? IntegrationService.GitHub
-        : parsedUrl.hostname === "linear.app"
-          ? IntegrationService.Linear
-          : IntegrationService.GitLab;
-  } catch {
-    // Invalid URL in unfurl data, default to GitLab
+  // Prefer the service reported by the unfurl provider, falling back to
+  // hostname sniffing for cached payloads written before the field existed.
+  let service = issue.service;
+  if (!service) {
+    try {
+      const parsedUrl = new URL(issue.url);
+      service =
+        parsedUrl.hostname === "github.com"
+          ? IntegrationService.GitHub
+          : parsedUrl.hostname === "linear.app"
+            ? IntegrationService.Linear
+            : IntegrationService.GitLab;
+    } catch {
+      // Invalid URL in unfurl data, default to GitLab
+      service = IntegrationService.GitLab;
+    }
   }
 
   return (

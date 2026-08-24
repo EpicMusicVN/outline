@@ -1,0 +1,7 @@
+{
+  "id": "plane",
+  "name": "Plane",
+  "priority": 12,
+  "description": "Adds a Plane integration for link unfurling.",
+  "after": "gitlab"
+}

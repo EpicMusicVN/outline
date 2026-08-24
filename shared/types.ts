@@ -175,6 +175,7 @@ export enum IntegrationService {
   GitHub = "github",
   GitLab = "gitlab",
   Linear = "linear",
+  Plane = "plane",
   Figma = "figma",
   Notion = "notion",
   Markdown = "markdown",
@@ -202,12 +203,14 @@ export type IssueTrackerIntegrationService = Extract<
   | IntegrationService.GitHub
   | IntegrationService.GitLab
   | IntegrationService.Linear
+  | IntegrationService.Plane
 >;
 
 export const IssueTrackerIntegrationService = {
   GitHub: IntegrationService.GitHub,
   GitLab: IntegrationService.GitLab,
   Linear: IntegrationService.Linear,
+  Plane: IntegrationService.Plane,
 } as const;
 
 export type UserCreatableIntegrationService = Extract<
@@ -280,6 +283,10 @@ export type IntegrationSettings<T> = T extends IntegrationType.Embed
       };
       linear?: {
         workspace: { id: string; name: string; key: string; logoUrl?: string };
+      };
+      plane?: {
+        url: string;
+        workspaceSlug: string;
       };
       diagrams?: {
         url: string;
@@ -656,6 +663,8 @@ export type UnfurlResponse = {
   [UnfurlResourceType.Issue]: {
     /** The resource type */
     type: UnfurlResourceType.Issue;
+    /** The integration service that produced this unfurl, when known */
+    service?: IssueTrackerIntegrationService;
     /** Issue link */
     url: string;
     /** Issue identifier */
@@ -681,6 +690,8 @@ export type UnfurlResponse = {
   [UnfurlResourceType.PR]: {
     /** The resource type */
     type: UnfurlResourceType.PR;
+    /** The integration service that produced this unfurl, when known */
+    service?: IssueTrackerIntegrationService;
     /** Pull Request link */
     url: string;
     /** Pull Request identifier */

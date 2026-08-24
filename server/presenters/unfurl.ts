@@ -122,13 +122,34 @@ const presentDocument = (
   };
 };
 
-const presentPR = (data: UnfurlData): UnfurlResponse[UnfurlResourceType.PR] =>
-  data as UnfurlResponse[UnfurlResourceType.PR]; // this would have been transformed by the unfurl plugin.
+// The data will have been transformed by the unfurl plugin, fields are picked
+// individually so that additional metadata is never exposed in the response.
+const presentPR = (data: UnfurlData): UnfurlResponse[UnfurlResourceType.PR] => ({
+  type: UnfurlResourceType.PR,
+  url: data.url,
+  id: data.id,
+  title: data.title,
+  description: data.description,
+  author: data.author,
+  state: data.state,
+  createdAt: data.createdAt,
+  service: data.service,
+});
 
 const presentIssue = (
   data: UnfurlData
-): UnfurlResponse[UnfurlResourceType.Issue] =>
-  data as UnfurlResponse[UnfurlResourceType.Issue]; // this would have been transformed by the unfurl plugin.
+): UnfurlResponse[UnfurlResourceType.Issue] => ({
+  type: UnfurlResourceType.Issue,
+  url: data.url,
+  id: data.id,
+  title: data.title,
+  description: data.description,
+  author: data.author,
+  labels: data.labels,
+  state: data.state,
+  createdAt: data.createdAt,
+  service: data.service,
+});
 
 const presentProject = (
   data: UnfurlData

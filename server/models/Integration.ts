@@ -122,6 +122,7 @@ class Integration<T = unknown> extends ParanoidModel<
           github: settings?.github,
           gitlab: settings?.gitlab,
           linear: settings?.linear,
+          plane: settings?.plane,
           diagrams: settings?.diagrams,
         };
       }
