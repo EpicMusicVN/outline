@@ -16,3 +16,17 @@ export const PlaneDisconnectSchema = BaseSchema.extend({
 });
 
 export type PlaneDisconnectReq = z.infer<typeof PlaneDisconnectSchema>;
+
+export const PlaneInfoSchema = BaseSchema.extend({
+  body: z.object({
+    url: z.url(),
+  }),
+});
+
+export type PlaneInfoReq = z.infer<typeof PlaneInfoSchema>;
+
+export const PlaneProjectsSchema = BaseSchema.extend({
+  body: z.object({}),
+});
+
+export type PlaneProjectsReq = z.infer<typeof PlaneProjectsSchema>;

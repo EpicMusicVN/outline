@@ -3,6 +3,13 @@ import type { UnfurlIssueOrPR, UnfurlProject } from "@server/types";
 import fetch, { type Response } from "@server/utils/fetch";
 import { validateUrlNotPrivate } from "@server/utils/url";
 import { z } from "zod";
+import type {
+  PlaneBoard,
+  PlaneBoardColumn,
+  PlaneBoardItem,
+  PlaneIssueCard,
+  PlaneProjectSummary,
+} from "../shared/types";
 
 const ApiVersion = "v1";
 const WorkItemsSegment = "work-items";
@@ -109,6 +116,12 @@ export class PlaneConfigError extends PlaneError {}
 export class PlaneRateLimitError extends PlaneError {}
 
 export class PlaneNotFoundError extends PlaneError {}
+
+const WorkItemListSchema = z
+  .object({
+    results: z.array(WorkItemSchema),
+  })
+  .passthrough();
 
 export class PlaneClient {
   private baseUrl: string;
@@ -340,5 +353,175 @@ export class PlaneClient {
     } catch {
       return null;
     }
+  }
+
+  public async listProjectIssues(
+    workspaceSlug: string,
+    projectId: string,
+    limit: number
+  ): Promise<{ items: WorkItem[]; hasMore: boolean }> {
+    const data = await this.request(
+      `/api/${ApiVersion}/workspaces/${encodeURIComponent(
+        workspaceSlug
+      )}/projects/${encodeURIComponent(projectId)}/${WorkItemsSegment}/?expand=${ExpandFields}&per_page=${
+        limit + 1
+      }`,
+      WorkItemListSchema
+    );
+    return {
+      items: data.results.slice(0, limit),
+      hasMore: data.results.length > limit,
+    };
+  }
+
+  public static toPlaneCard(workItem: WorkItem, url: string): PlaneIssueCard {
+    const state =
+      workItem.state !== null && typeof workItem.state === "object"
+        ? workItem.state
+        : null;
+    const project =
+      workItem.project !== null && typeof workItem.project === "object"
+        ? workItem.project
+        : null;
+    const createdBy =
+      workItem.created_by !== null && typeof workItem.created_by === "object"
+        ? workItem.created_by
+        : null;
+    const issueId =
+      project?.identifier && typeof workItem.sequence_id === "number"
+        ? `${project.identifier}-${workItem.sequence_id}`
+        : workItem.id;
+
+    return {
+      type: UnfurlResourceType.Issue,
+      url,
+      id: issueId,
+      title: workItem.name,
+      description: PlaneClient.stripHtml(workItem.description_html),
+      author: createdBy
+        ? {
+            name:
+              createdBy.display_name ||
+              [createdBy.first_name, createdBy.last_name]
+                .filter(Boolean)
+                .join(" ") ||
+              createdBy.email ||
+              "Unknown",
+            avatarUrl: createdBy.avatar_url ?? "",
+          }
+        : { name: "Unknown", avatarUrl: "" },
+      assignees: PlaneClient.mapAssignees(workItem.assignees),
+      labels: PlaneClient.mapLabels(workItem.labels),
+      state: {
+        id: state?.id ?? "unknown",
+        name: state?.name ?? "Unknown",
+        color: state?.color ?? DefaultColor,
+        group: state?.group ?? undefined,
+      },
+      createdAt: workItem.created_at ?? "",
+    } satisfies PlaneIssueCard;
+  }
+
+  public static toPlaneBoard(
+    project: Project,
+    items: WorkItem[],
+    hasMore: boolean,
+    context: {
+      baseUrl: string;
+      workspaceSlug: string;
+      projectId: string;
+      url: string;
+    }
+  ): PlaneBoard {
+    const columns = new Map<string, PlaneBoardColumn>();
+
+    for (const workItem of items) {
+      const state =
+        workItem.state !== null && typeof workItem.state === "object"
+          ? workItem.state
+          : null;
+      const key = state?.id ?? "unknown";
+
+      let column = columns.get(key);
+      if (!column) {
+        column = {
+          state: {
+            id: key,
+            name: state?.name ?? "Unknown",
+            color: state?.color ?? DefaultColor,
+            group: state?.group ?? undefined,
+          },
+          items: [],
+        };
+        columns.set(key, column);
+      }
+
+      const itemProject =
+        workItem.project !== null && typeof workItem.project === "object"
+          ? workItem.project
+          : null;
+      const issueId =
+        itemProject?.identifier && typeof workItem.sequence_id === "number"
+          ? `${itemProject.identifier}-${workItem.sequence_id}`
+          : workItem.id;
+
+      column.items.push({
+        id: issueId,
+        url: `${context.baseUrl}/${context.workspaceSlug}/projects/${context.projectId}/issues/${workItem.id}/`,
+        title: workItem.name,
+        priority: workItem.priority ?? null,
+        labels: PlaneClient.mapLabels(workItem.labels),
+        assignees: PlaneClient.mapAssignees(workItem.assignees),
+      } satisfies PlaneBoardItem);
+    }
+
+    return {
+      type: UnfurlResourceType.Project,
+      url: context.url,
+      id: project.id,
+      name: project.name,
+      columns: Array.from(columns.values()),
+      hasMore,
+    } satisfies PlaneBoard;
+  }
+
+  public static toPlaneProjectSummary(project: Project): PlaneProjectSummary {
+    return {
+      id: project.id,
+      name: project.name,
+      identifier: project.identifier ?? null,
+    } satisfies PlaneProjectSummary;
+  }
+
+  private static mapLabels(
+    labels: WorkItem["labels"]
+  ): PlaneIssueCard["labels"] {
+    return (labels ?? []).map((label) =>
+      typeof label === "string"
+        ? { name: label, color: DefaultColor }
+        : { name: label.name, color: label.color ?? DefaultColor }
+    );
+  }
+
+  private static mapAssignees(
+    assignees: WorkItem["assignees"]
+  ): PlaneIssueCard["assignees"] {
+    const result: PlaneIssueCard["assignees"] = [];
+    for (const assignee of assignees ?? []) {
+      if (typeof assignee !== "object" || assignee === null) {
+        continue;
+      }
+      result.push({
+        name:
+          assignee.display_name ||
+          [assignee.first_name, assignee.last_name]
+            .filter(Boolean)
+            .join(" ") ||
+          assignee.email ||
+          "Unknown",
+        avatarUrl: assignee.avatar_url ?? "",
+      });
+    }
+    return result;
   }
 }
