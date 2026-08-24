@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { User } from "@server/models";
 import RateLimiter from "@server/utils/RateLimiter";
 import env from "@server/env";
+import { buildDocument, buildTeam, buildViewer } from "@server/test/factories";
+import { PlaneUtils } from "../../shared/PlaneUtils";
 
 const server = getTestServer();
 const url = "https://8.8.8.8";
@@ -500,5 +502,214 @@ describe("#plane.projects", () => {
     } finally {
       env.RATE_LIMITER_ENABLED = originalEnabled;
     }
+  });
+});
+
+describe("#plane.createIssue", () => {
+  function createIssueBody(overrides: Record<string, string> = {}) {
+    return {
+      documentId: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      projectId,
+      title: "New issue title",
+      ...overrides,
+    };
+  }
+
+  const createPath = `${url}/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/work-items/`;
+
+  it("should require authentication", async () => {
+    const res = await server.post("/api/plane.createIssue", {
+      body: createIssueBody(),
+    });
+    expect(res.status).toEqual(401);
+  });
+
+  it("should reject a user without document write permission", async () => {
+    const team = await buildTeam();
+    const author = await buildUser({ teamId: team.id });
+    const viewer = await buildViewer({ teamId: team.id });
+    const document = await buildDocument({
+      userId: author.id,
+      teamId: team.id,
+    });
+    await createConnectedIntegration(author);
+
+    const res = await server.post("/api/plane.createIssue", viewer, {
+      body: createIssueBody({ documentId: document.id }),
+    });
+    expect(res.status).toEqual(403);
+  });
+
+  it("should return a typed error, not a 500, when the team has no Plane integration", async () => {
+    const user = await buildUser();
+    const document = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+    });
+
+    const res = await server.post("/api/plane.createIssue", user, {
+      body: createIssueBody({ documentId: document.id }),
+    });
+    expect(res.status).toEqual(400);
+    const body = await res.json();
+    expect(body.error).toBeDefined();
+  });
+
+  it("should reject with a 4xx, not a 500, for an unknown project and release the idempotency guard", async () => {
+    const user = await buildUser();
+    const document = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+    });
+    await createConnectedIntegration(user);
+    mswServer.use(
+      http.post(createPath, () =>
+        HttpResponse.json(
+          { detail: "You do not have permission to perform this action." },
+          { status: 403 }
+        )
+      )
+    );
+
+    const body = createIssueBody({
+      documentId: document.id,
+      title: "Unknown project issue",
+    });
+    const failed = await server.post("/api/plane.createIssue", user, {
+      body,
+    });
+    expect(failed.status).toBeGreaterThanOrEqual(400);
+    expect(failed.status).toBeLessThan(500);
+
+    // No partial state: the failed attempt must not leave a stale
+    // idempotency lock blocking a legitimate retry with the same inputs.
+    mswServer.use(
+      http.post(createPath, () =>
+        HttpResponse.json(
+          buildWorkItem({ id: issueId, name: "Unknown project issue" }),
+          { status: 201 }
+        )
+      )
+    );
+    const retried = await server.post("/api/plane.createIssue", user, {
+      body,
+    });
+    expect(retried.status).toEqual(200);
+  });
+
+  it("should signal reconnect required when Plane returns 401", async () => {
+    const user = await buildUser();
+    const document = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+    });
+    await createConnectedIntegration(user);
+    mswServer.use(
+      http.post(createPath, () =>
+        HttpResponse.json(
+          { detail: "Authentication credentials were not provided." },
+          { status: 401 }
+        )
+      )
+    );
+
+    const res = await server.post("/api/plane.createIssue", user, {
+      body: createIssueBody({ documentId: document.id }),
+    });
+    expect(res.status).toEqual(200);
+    const body = await res.json();
+    expect(body.data).toEqual({ type: "reconnect_required" });
+  });
+
+  it("should create only one issue when the same request is double-submitted", async () => {
+    const user = await buildUser();
+    const document = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+    });
+    await createConnectedIntegration(user);
+
+    let callCount = 0;
+    mswServer.use(
+      http.post(createPath, async () => {
+        callCount += 1;
+        return HttpResponse.json(buildWorkItem({ name: "Race issue" }), {
+          status: 201,
+        });
+      })
+    );
+
+    const body = createIssueBody({
+      documentId: document.id,
+      title: "Race issue",
+    });
+    const [first, second] = await Promise.all([
+      server.post("/api/plane.createIssue", user, { body }),
+      server.post("/api/plane.createIssue", user, { body }),
+    ]);
+
+    const statuses = [first.status, second.status];
+    expect(statuses).toContain(200);
+    expect(statuses).toContain(400);
+    expect(callCount).toEqual(1);
+  });
+
+  it("should register a rate limiter for this route", async () => {
+    const originalEnabled = env.RATE_LIMITER_ENABLED;
+    env.RATE_LIMITER_ENABLED = true;
+    try {
+      const user = await buildUser();
+      const document = await buildDocument({
+        userId: user.id,
+        teamId: user.teamId,
+      });
+      await server.post("/api/plane.createIssue", user, {
+        body: createIssueBody({ documentId: document.id }),
+      });
+      expect(RateLimiter.hasRateLimiter("/api/plane.createIssue")).toBe(true);
+      expect(
+        RateLimiter.getRateLimiter("/api/plane.createIssue").points
+      ).toEqual(25);
+    } finally {
+      env.RATE_LIMITER_ENABLED = originalEnabled;
+    }
+  });
+
+  it("should create an issue and return a URL that PlaneUtils.parseUrl accepts", async () => {
+    const user = await buildUser();
+    const document = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+    });
+    await createConnectedIntegration(user);
+
+    const createdId = "b6f9f6d0-1c9a-4d2a-9b0e-2a6c2a4d9f11";
+    mswServer.use(
+      http.post(createPath, () =>
+        HttpResponse.json(
+          buildWorkItem({ id: createdId, name: "New issue" }),
+          { status: 201 }
+        )
+      )
+    );
+
+    const res = await server.post("/api/plane.createIssue", user, {
+      body: createIssueBody({
+        documentId: document.id,
+        title: "New issue",
+      }),
+    });
+    expect(res.status).toEqual(200);
+
+    const body = await res.json();
+    const expectedUrl = `${url}/${workspaceSlug}/projects/${projectId}/issues/${createdId}/`;
+    expect(body.data.url).toEqual(expectedUrl);
+    expect(PlaneUtils.parseUrl(body.data.url, url, workspaceSlug)).toEqual({
+      type: "issue",
+      workspaceSlug,
+      projectId,
+      issueId: createdId,
+      url: expectedUrl,
+    });
   });
 });

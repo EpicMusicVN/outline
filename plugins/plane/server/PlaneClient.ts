@@ -123,6 +123,15 @@ const WorkItemListSchema = z
   })
   .passthrough();
 
+const CreateWorkItemRequestSchema = z
+  .object({
+    name: z.string().min(1),
+    description_html: z.string().optional(),
+  })
+  .strict();
+
+export type CreateWorkItemRequest = z.infer<typeof CreateWorkItemRequestSchema>;
+
 export class PlaneClient {
   private baseUrl: string;
   private apiKey: string;
@@ -523,5 +532,105 @@ export class PlaneClient {
       });
     }
     return result;
+  }
+
+  /**
+   * Creates a work item (issue) in the given project. Only `name` is
+   * required by the Plane API (verified in the P2 spike); the request is
+   * validated against the same shape before it is sent.
+   */
+  public async createIssue(
+    workspaceSlug: string,
+    projectId: string,
+    input: CreateWorkItemRequest
+  ): Promise<WorkItem> {
+    const body = CreateWorkItemRequestSchema.parse(input);
+    return this.requestMutation(
+      `/api/${ApiVersion}/workspaces/${encodeURIComponent(
+        workspaceSlug
+      )}/projects/${encodeURIComponent(projectId)}/${WorkItemsSegment}/`,
+      WorkItemSchema,
+      body
+    );
+  }
+
+  /**
+   * Builds the canonical browse URL for a work item, in the same
+   * `{workspaceSlug}/projects/{projectId}/issues/{id}` shape
+   * `PlaneUtils.parseUrl` resolves and `toPlaneBoard` already links to.
+   * Creation must not invent a second URL shape (R1 applies to the write
+   * path too).
+   */
+  public static toIssueUrl(
+    workItem: Pick<WorkItem, "id">,
+    context: { baseUrl: string; workspaceSlug: string; projectId: string }
+  ): string {
+    return `${context.baseUrl}/${context.workspaceSlug}/projects/${context.projectId}/issues/${workItem.id}/`;
+  }
+
+  /**
+   * POST variant of `request`, kept as a separate method rather than an
+   * overload so the plugin's append-only file convention (P2/P3/P4/P7) never
+   * has to touch `request`'s existing signature or body.
+   */
+  private async requestMutation<T>(
+    path: string,
+    schema: z.ZodType<T>,
+    body: unknown
+  ): Promise<T> {
+    const url = `${this.baseUrl}${path}`;
+    await validateUrlNotPrivate(url);
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "X-Api-Key": this.apiKey,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new PlaneError(`Failed to connect to Plane at ${this.baseUrl}`);
+    }
+
+    if (res.status === 401) {
+      throw new PlaneAuthError("The Plane API key is invalid or expired");
+    }
+    if (res.status === 403) {
+      const errorBody = await this.parseErrorBody(res);
+      if (errorBody?.detail === InvalidTokenDetail) {
+        throw new PlaneAuthError("The Plane API key is invalid or expired");
+      }
+      throw new PlaneConfigError(
+        "The Plane API key does not have permission to access this resource"
+      );
+    }
+    if (res.status === 429) {
+      throw new PlaneRateLimitError("Plane API rate limit exceeded");
+    }
+    if (res.status === 404) {
+      throw new PlaneNotFoundError(
+        "The requested Plane resource does not exist"
+      );
+    }
+    if (!res.ok) {
+      throw new PlaneError(
+        `Plane API request failed with status ${res.status}`
+      );
+    }
+
+    const json = await res.json().catch(() => {
+      throw new PlaneError("Plane API returned an invalid response");
+    });
+    const parsed = schema.safeParse(json);
+    if (!parsed.success) {
+      throw new PlaneError(
+        "Plane API returned an unexpected response shape"
+      );
+    }
+    return parsed.data;
   }
 }

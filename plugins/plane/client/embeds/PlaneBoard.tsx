@@ -1,26 +1,31 @@
+import { PlusIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import { s } from "@shared/styles";
 import { Avatar, AvatarSize } from "~/components/Avatar";
+import Button from "~/components/Button";
+import Flex from "~/components/Flex";
 import Text from "~/components/Text";
 import type { PlaneBoard as PlaneBoardData } from "../../shared/types";
 import EmbedFrame, { ColorDot } from "./EmbedFrame";
+import PlaneCreateIssueDialog from "./PlaneCreateIssueDialog";
 
 type Props = {
   board: PlaneBoardData;
-  /** Reserved for P7's "New issue" affordance (Open Question 2, option a); unused in the v1 read-only board. */
+  /** Shows the "New issue" affordance (Open Question 2, option a) when true. */
   isEditable: boolean;
   isSelected: boolean;
 };
 
 /** Renders a Plane project as a mini-board: columns grouped by state. */
-export default function PlaneBoard({ board, isSelected }: Props) {
+export default function PlaneBoard({ board, isEditable, isSelected }: Props) {
   const { t } = useTranslation();
   const itemCount = board.columns.reduce(
     (sum, column) => sum + column.items.length,
     0
   );
+  const [isCreateOpen, setCreateOpen] = React.useState(false);
 
   return (
     <EmbedFrame
@@ -28,6 +33,13 @@ export default function PlaneBoard({ board, isSelected }: Props) {
       title={board.name}
       canonicalUrl={board.url}
     >
+      {isEditable && (
+        <Toolbar justify="flex-end">
+          <Button neutral onClick={() => setCreateOpen(true)}>
+            <PlusIcon size={16} /> {t("New issue")}
+          </Button>
+        </Toolbar>
+      )}
       {board.hasMore && (
         <HasMoreNotice type="tertiary" size="xsmall">
           {t("Showing the first {{count}} items · view the rest in Plane", {
@@ -95,6 +107,12 @@ export default function PlaneBoard({ board, isSelected }: Props) {
             </Column>
           ))}
         </Columns>
+      )}
+      {isCreateOpen && (
+        <PlaneCreateIssueDialog
+          projectId={board.id}
+          onRequestClose={() => setCreateOpen(false)}
+        />
       )}
     </EmbedFrame>
   );
@@ -175,4 +193,8 @@ const ItemMeta = styled.div`
   align-items: center;
   gap: 4px;
   margin-top: 6px;
+`;
+
+const Toolbar = styled(Flex)`
+  padding: 8px 16px 0;
 `;

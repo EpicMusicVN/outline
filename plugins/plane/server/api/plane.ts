@@ -27,9 +27,30 @@ import Logger from "@server/logging/Logger";
 import { PlaneNotFoundError } from "../PlaneClient";
 import { PlaneUtils } from "../../shared/PlaneUtils";
 import { PlaneInfoStatus } from "../../shared/types";
+import { createHash } from "crypto";
+import { Document } from "@server/models";
+import Redis from "@server/storage/redis";
 
 /** Hard cap on board items returned by `plane.info` (D5). */
 const BoardItemLimit = 100;
+
+/**
+ * Guards `plane.createIssue` against double-submit: the same document,
+ * project and title cannot create two issues within this short window
+ * (R11). Released on failure so a genuine retry after a transient error
+ * is not blocked for the full window.
+ */
+const CreateIssueIdempotencyTtlSeconds = 30;
+
+function planeCreateIssueIdempotencyKey(
+  teamId: string,
+  documentId: string,
+  projectId: string,
+  title: string
+): string {
+  const digest = createHash("sha256").update(title).digest("hex");
+  return `plane:createIssue:${teamId}:${documentId}:${projectId}:${digest}`;
+}
 
 const router = new Router();
 
@@ -300,6 +321,107 @@ router.post(
       }
       throw err;
     }
+  }
+);
+
+router.post(
+  "plane.createIssue",
+  rateLimiter(RateLimiterStrategy.TwentyFivePerMinute),
+  auth(),
+  validate(T.PlaneCreateIssueSchema),
+  async (ctx: APIContext<T.PlaneCreateIssueReq>) => {
+    const { documentId, projectId, title, description } = ctx.input.body;
+    const { user } = ctx.state.auth;
+
+    const document = await Document.findByPk(documentId, {
+      userId: user.id,
+    });
+    authorize(user, "update", document);
+
+    const integration = (await Integration.findOne({
+      where: { service: IntegrationService.Plane, teamId: user.teamId },
+      include: [
+        {
+          model: IntegrationAuthentication,
+          as: "authentication",
+          required: true,
+        },
+      ],
+    })) as Integration<IntegrationType.Embed> | null;
+
+    const settings = integration?.settings?.plane;
+    if (!integration?.authentication || !settings) {
+      throw InvalidRequestError("Plane is not connected for this team");
+    }
+
+    const idempotencyKey = planeCreateIssueIdempotencyKey(
+      user.teamId,
+      documentId,
+      projectId,
+      title
+    );
+    const acquired = await Redis.defaultClient.set(
+      idempotencyKey,
+      "1",
+      "EX",
+      CreateIssueIdempotencyTtlSeconds,
+      "NX"
+    );
+    if (!acquired) {
+      throw InvalidRequestError(
+        "A request to create this issue was already submitted; wait before retrying"
+      );
+    }
+
+    const client = new PlaneClient({
+      baseUrl: settings.url,
+      apiKey: integration.authentication.token,
+    });
+
+    let issueUrl: string;
+    let workItemId: string;
+    try {
+      const workItem = await client.createIssue(
+        settings.workspaceSlug,
+        projectId,
+        { name: title, description_html: description }
+      );
+      issueUrl = PlaneClient.toIssueUrl(workItem, {
+        baseUrl: settings.url,
+        workspaceSlug: settings.workspaceSlug,
+        projectId,
+      });
+      workItemId = workItem.id;
+    } catch (err) {
+      await Redis.defaultClient.del(idempotencyKey);
+      if (err instanceof PlaneAuthError) {
+        ctx.body = { data: { type: PlaneInfoStatus.ReconnectRequired } };
+        return;
+      }
+      if (err instanceof PlaneError) {
+        Logger.warn("Failed to create Plane issue", {
+          error: toError(err).message,
+          teamId: user.teamId,
+          userId: user.id,
+          projectId,
+        });
+        throw InvalidRequestError(
+          `Unable to create Plane issue: ${err.message}`
+        );
+      }
+      throw err;
+    }
+
+    Logger.info("plugins", "Created Plane issue", {
+      teamId: user.teamId,
+      userId: user.id,
+      documentId,
+      projectId,
+      workItemId,
+      url: issueUrl,
+    });
+
+    ctx.body = { data: { url: issueUrl } };
   }
 );
 

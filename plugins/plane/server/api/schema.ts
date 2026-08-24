@@ -30,3 +30,14 @@ export const PlaneProjectsSchema = BaseSchema.extend({
 });
 
 export type PlaneProjectsReq = z.infer<typeof PlaneProjectsSchema>;
+
+export const PlaneCreateIssueSchema = BaseSchema.extend({
+  body: z.object({
+    documentId: z.uuid(),
+    projectId: z.uuid(),
+    title: z.string().min(1).max(255),
+    description: z.string().max(10000).optional(),
+  }),
+});
+
+export type PlaneCreateIssueReq = z.infer<typeof PlaneCreateIssueSchema>;
