@@ -1,9 +1,11 @@
 import { isArray, sortBy } from "es-toolkit/compat";
 import { action, observable } from "mobx";
 import type { IObservableArray } from "mobx";
+import type { EmbedDescriptor } from "@shared/editor/embeds";
 import type Team from "~/models/Team";
 import type User from "~/models/User";
 import type { LazyComponent } from "~/components/LazyLoad";
+import type { EditorCommand } from "~/editor/menus/pluginCommandTypes";
 import { useComputed } from "~/hooks/useComputed";
 import Logger from "./Logger";
 import isCloudHosted from "./isCloudHosted";
@@ -15,6 +17,8 @@ export enum Hook {
   Settings = "settings",
   Imports = "imports",
   Icon = "icon",
+  EditorCommand = "editorCommand",
+  EmbedDescriptor = "embedDescriptor",
 }
 
 /**
@@ -46,6 +50,8 @@ type PluginValueMap = {
     action: React.ReactElement;
   };
   [Hook.Icon]: React.ElementType;
+  [Hook.EditorCommand]: EditorCommand[];
+  [Hook.EmbedDescriptor]: EmbedDescriptor[];
 };
 
 export type Plugin<T extends Hook> = {

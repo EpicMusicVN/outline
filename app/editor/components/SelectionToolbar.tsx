@@ -2,6 +2,7 @@ import type { EditorState, Selection } from "prosemirror-state";
 import Suggestion from "~/editor/extensions/Suggestion";
 import { NodeSelection, TextSelection } from "prosemirror-state";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 
 import filterExcessSeparators from "@shared/editor/lib/filterExcessSeparators";
 import { buildSelectionContext } from "@shared/editor/lib/buildSelectionContext";
@@ -27,6 +28,8 @@ import ToolbarMenu from "./ToolbarMenu";
 import InlineMenu from "./InlineMenu";
 import StickyBlockToolbar from "./StickyBlockToolbar";
 import { isModKey } from "@shared/utils/keyboard";
+import { useEditorCommands } from "~/hooks/useEditorCommands";
+import { buildPluginDropdowns } from "../menus/pluginCommands";
 
 type Props = {
   /** Whether the text direction is right-to-left */
@@ -67,13 +70,16 @@ enum Toolbar {
 
 export function SelectionToolbar(props: Props) {
   const { readOnly = false } = props;
-  const { view, extensions, commands, selectionToolbarMenus } = useEditor();
+  const editor = useEditor();
+  const { view, extensions, commands, selectionToolbarMenus } = editor;
   const menuRef = React.useRef<HTMLDivElement | null>(null);
   const isMobile = useMobile();
   const isActive = props.isActive || isMobile;
   const { state } = view;
   const [autoFocusLinkInput, setAutoFocusLinkInput] = React.useState(false);
   const isDragging = useIsDragging(state);
+  const pluginGroups = useEditorCommands("selection");
+  const { t } = useTranslation();
   const { selection } = state;
   const [activeToolbar, setActiveToolbar] = React.useState<Toolbar | null>(
     null
@@ -258,6 +264,19 @@ export function SelectionToolbar(props: Props) {
     }
     return item;
   });
+
+  // Plugin selection commands render as one collapsed dropdown per plugin,
+  // appended after the core menu filter so they cannot be filtered out.
+  if (pluginGroups.length && matched?.variant !== MenuType.inline) {
+    const pluginItems = buildPluginDropdowns(pluginGroups, editor, ctx, t);
+    if (pluginItems.length) {
+      items = filterExcessSeparators([
+        ...items,
+        { name: "separator" },
+        ...pluginItems,
+      ]);
+    }
+  }
 
   const handleClickOutsideLinkEditor = (ev: MouseEvent | TouchEvent) => {
     if (ev.target instanceof Element && ev.target.closest(".image-wrapper")) {

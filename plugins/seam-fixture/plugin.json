@@ -1,0 +1,6 @@
+{
+  "id": "seam-fixture",
+  "name": "Seam Fixture",
+  "priority": 100,
+  "description": "Fixture plugin exercising the editor command and embed descriptor seams."
+}
