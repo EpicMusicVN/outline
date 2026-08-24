@@ -1,8 +1,5 @@
-import {
-  IntegrationService,
-  IntegrationType,
-  UnfurlResourceType,
-} from "@shared/types";
+import { IntegrationService, UnfurlResourceType } from "@shared/types";
+import type { IntegrationType } from "@shared/types";
 import { errToString, toError } from "@shared/utils/error";
 import Logger from "@server/logging/Logger";
 import type { User } from "@server/models";

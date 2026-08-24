@@ -51,7 +51,7 @@ function openFixturePopover(ctx: EditorCommandContext, label: string) {
 
 const rewriteCommand: EditorCommand = {
   id: "rewrite",
-  title: (t) => "Rewrite selection",
+  title: (_t) => "Rewrite selection",
   keywords: "rewrite ai",
   group: "selection",
   run: (ctx) => {
@@ -76,7 +76,7 @@ const rewriteCommand: EditorCommand = {
 
 const summarizeCommand: EditorCommand = {
   id: "summarize",
-  title: (t) => "Summarize selection",
+  title: (_t) => "Summarize selection",
   keywords: "summarize ai",
   group: "selection",
   run: (ctx) => {
@@ -87,7 +87,7 @@ const summarizeCommand: EditorCommand = {
 
 const calloutCommand: EditorCommand = {
   id: "insert-callout",
-  title: (t) => "Insert fixture callout",
+  title: (_t) => "Insert fixture callout",
   keywords: "fixture callout",
   group: "block",
   run: (ctx) => {

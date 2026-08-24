@@ -13,7 +13,7 @@ import {
   serializer,
 } from "@shared/test/editor";
 import type { Editor } from "~/editor";
-import type { SelectionContext } from "@shared/editor/types";
+import type { MenuItem, SelectionContext } from "@shared/editor/types";
 import type { PluginCommandGroup } from "~/hooks/useEditorCommands";
 import Logger from "~/utils/Logger";
 import { PluginCommandRangePlugin } from "../plugins/PluginCommandRangePlugin";
@@ -67,7 +67,7 @@ function createEditorMock(
   return {
     editor,
     view: editor.view,
-    dispose() {
+    dispose: () => {
       editor.view.destroy();
     },
   };
@@ -327,9 +327,7 @@ describe("buildPluginDropdowns", () => {
       t
     );
 
-    const children = items[0].children as NonNullable<
-      (typeof items)[0]["children"]
-    >;
+    const children = items[0].children as MenuItem[];
     expect(children.map((child) => child.title)).toEqual(["Title a", "Title b"]);
     for (const child of children) {
       expect(child.title).toBe(child.label);
@@ -428,9 +426,7 @@ describe("buildPluginDropdowns", () => {
       t
     );
 
-    const children = items[0].children as NonNullable<
-      (typeof items)[0]["children"]
-    >;
+    const children = items[0].children as MenuItem[];
     children[0].onClick?.();
 
     expect(run).toHaveBeenCalledTimes(1);

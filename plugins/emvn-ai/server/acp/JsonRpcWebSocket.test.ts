@@ -19,11 +19,24 @@ class FakeSocket implements JsonRpcSocketTransport {
     }
   }
 
+  public on(event: "open", listener: () => void): void;
+  public on(event: "message", listener: (data: unknown) => void): void;
+  public on(event: "error", listener: (error: unknown) => void): void;
+  public on(
+    event: "close",
+    listener: (code: number, reason: unknown) => void
+  ): void;
   public on(
     event: "open" | "message" | "error" | "close",
-    listener: (...args: unknown[]) => void
+    listener:
+      | (() => void)
+      | ((data: unknown) => void)
+      | ((error: unknown) => void)
+      | ((code: number, reason: unknown) => void)
   ): void {
-    (this.listeners[event] ??= []).push(listener);
+    (this.listeners[event] ??= []).push(
+      listener as (...args: unknown[]) => void
+    );
   }
 
   public send(data: string): void {

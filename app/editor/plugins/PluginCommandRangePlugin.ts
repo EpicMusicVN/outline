@@ -1,5 +1,5 @@
 import { Plugin, PluginKey } from "prosemirror-state";
-import type { EditorState, Transaction } from "prosemirror-state";
+import type { EditorState } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { v4 as uuidv4 } from "uuid";
 

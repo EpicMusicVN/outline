@@ -189,6 +189,7 @@ describe("#emvnAi.command", () => {
 
   it("returns a 502 JSON error, no SSE headers, when the backend fails before yielding", async () => {
     const { owner, document } = await buildDocumentAndUser();
+    // oxlint-disable-next-line require-yield
     mockBackend(async function* () {
       throw new Error("mint failed: agent hub unreachable");
     });

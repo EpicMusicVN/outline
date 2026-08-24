@@ -184,7 +184,7 @@ describe("frame builders", () => {
   it("should build a session/cancel notification without an id", () => {
     const frame = cancelNotification("agent:1");
     expect(frame.method).toBe("session/cancel");
-    expect(frame.id).toBeUndefined();
+    expect("id" in frame).toBe(false);
     expect(frame.params).toEqual({ sessionId: "agent:1" });
   });
 

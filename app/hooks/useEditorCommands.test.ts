@@ -25,12 +25,12 @@ function renderHook<T>(useHook: () => T) {
 
   return {
     result,
-    rerender() {
+    rerender: () => {
       act(() => {
         ReactDOM.render(React.createElement(Component), container);
       });
     },
-    unmount() {
+    unmount: () => {
       act(() => {
         ReactDOM.unmountComponentAtNode(container);
       });

@@ -55,7 +55,9 @@ export class AcpBackend implements AIBackend {
       }
     };
 
-    const endWith = (event: AIStreamEvent): void => {
+    const endWith = (
+      event: Extract<AIStreamEvent, { type: "done" } | { type: "error" }>
+    ): void => {
       if (terminal) {
         return;
       }
@@ -236,7 +238,9 @@ function adoptSessionId(result: unknown): string {
   return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : "";
 }
 
-function toEventError(error: unknown): AIStreamEvent {
+function toEventError(
+  error: unknown
+): Extract<AIStreamEvent, { type: "error" }> {
   return {
     type: "error",
     message: error instanceof Error ? error.message : "Agent request failed",

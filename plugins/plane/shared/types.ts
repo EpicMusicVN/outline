@@ -1,4 +1,4 @@
-import { UnfurlResourceType } from "@shared/types";
+import type { UnfurlResourceType } from "@shared/types";
 
 /**
  * Discriminants for the non-resource states `plane.info` can return alongside

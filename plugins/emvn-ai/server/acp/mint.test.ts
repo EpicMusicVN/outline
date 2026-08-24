@@ -1,10 +1,3 @@
-vi.mock("../env", () => ({
-  default: {
-    EMVN_AI_API_URL: "https://hub.example.com",
-    EMVN_AI_MINT_TOKEN: "default-mint-token",
-  },
-}));
-
 import {
   MINT_METHOD,
   MINT_PATH,
@@ -12,6 +5,7 @@ import {
   MintError,
   mintChatToken,
 } from "./mint";
+import env from "../env";
 import type { AITarget } from "../targets";
 
 const baseTarget: AITarget = {
@@ -28,13 +22,25 @@ const jsonResponse = (body: unknown, ok = true, status = 200) => ({
 
 const fetchMock = vi.fn();
 
+// The plugin env singleton is eagerly loaded by server/test/setup.ts's
+// import.meta.glob before this file's own imports resolve, so vi.mock("../env")
+// cannot intercept the already-cached instance in a full-suite run (same
+// class of issue as the emvnAi route's getAIBackend spy). Mutate the real
+// shared singleton instead, matching the plugin's plain (non-frozen) fields.
+const originalApiUrl = env.EMVN_AI_API_URL;
+const originalMintToken = env.EMVN_AI_MINT_TOKEN;
+
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
+  env.EMVN_AI_API_URL = "https://hub.example.com";
+  env.EMVN_AI_MINT_TOKEN = "default-mint-token";
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  env.EMVN_AI_API_URL = originalApiUrl;
+  env.EMVN_AI_MINT_TOKEN = originalMintToken;
 });
 
 describe("mintChatToken", () => {

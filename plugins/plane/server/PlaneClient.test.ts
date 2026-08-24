@@ -1,5 +1,6 @@
 import { http, HttpResponse } from "msw";
-import { IntegrationService } from "@shared/types";
+import type { JsonBodyType } from "msw";
+import { IntegrationService, UnfurlResourceType } from "@shared/types";
 import { server } from "@server/test/msw";
 import { describe, expect, it } from "vitest";
 import {
@@ -66,7 +67,7 @@ const expandedWorkItem = {
 function mockPlane(
   pathPattern: string,
   status: number,
-  body: unknown,
+  body: JsonBodyType,
   onRequest?: (request: Request) => void
 ) {
   server.use(
@@ -141,6 +142,9 @@ describe("#PlaneClient", () => {
         issueId
       );
       const unfurl = PlaneClient.toUnfurlIssue(item, issueUrl);
+      if (unfurl.type !== UnfurlResourceType.Issue) {
+        throw new Error("expected an issue unfurl");
+      }
 
       expect(unfurl.description).toBeNull();
       expect(unfurl.labels).toEqual([]);
@@ -176,7 +180,9 @@ describe("#PlaneClient", () => {
         "SPK-1"
       );
       const projectUuid =
-        typeof item.project === "object" ? item.project.id : item.project;
+        typeof item.project === "object" && item.project !== null
+          ? item.project.id
+          : item.project;
 
       expect(capturedUrl).toContain(
         `/api/v1/workspaces/${workspaceSlug}/work-items/SPK-1/`

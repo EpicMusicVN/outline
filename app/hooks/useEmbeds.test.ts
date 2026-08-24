@@ -16,7 +16,7 @@ const { integrationsMock, teamMock } = vi.hoisted(() => ({
     fetchAll: vi.fn(),
   },
   teamMock: {
-    getPreference: vi.fn(() => []),
+    getPreference: vi.fn((): string[] => []),
     preferences: null,
   },
 }));
@@ -46,7 +46,7 @@ function renderHook<T>(useHook: () => T) {
   });
   return {
     result,
-    unmount() {
+    unmount: () => {
       act(() => {
         ReactDOM.unmountComponentAtNode(container);
       });

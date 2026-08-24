@@ -1,4 +1,5 @@
 import { http, HttpResponse } from "msw";
+import type { JsonBodyType } from "msw";
 import { IntegrationService, IntegrationType } from "@shared/types";
 import { Integration, IntegrationAuthentication } from "@server/models";
 import { server     as mswServer } from "@server/test/msw";
@@ -283,7 +284,7 @@ async function createConnectedIntegration(user: User) {
   } as Partial<Integration>);
 }
 
-function mockPlane(pathPattern: string, status: number, body: unknown) {
+function mockPlane(pathPattern: string, status: number, body: JsonBodyType) {
   mswServer.use(
     http.get(`${url}/api/v1/${pathPattern}`, () =>
       HttpResponse.json(body, { status })

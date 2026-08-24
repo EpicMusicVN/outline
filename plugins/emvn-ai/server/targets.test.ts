@@ -151,7 +151,12 @@ describe("emvn-ai target registry", () => {
       for (const target of publicTargets) {
         expect(Object.keys(target)).toEqual(["id", "label"]);
       }
-      expect(listPublicTargets()).toEqual([]);
+    // The top-level (non-reloaded) import reflects the real .env.test
+    // EMVN_AI_TARGETS config, proving loadRegistry's dynamic import is an
+    // isolated module instance rather than sharing cached state with it.
+    expect(listPublicTargets()).toEqual([
+      { id: "test-target", label: "Test Target" },
+    ]);
     });
   });
 });

@@ -15,6 +15,7 @@ import {
   releaseRange,
   trackRange,
 } from "../plugins/PluginCommandRangePlugin";
+import type { TrackedRange } from "../plugins/PluginCommandRangePlugin";
 import type {
   EditorCommand,
   EditorCommandContext,
@@ -72,7 +73,7 @@ export function buildCommandContext(
     : undefined;
 
   // Always read fresh from the tracking plugin, never from a captured closure.
-  const currentRange = (): { from: number; to: number } | undefined =>
+  const currentRange = (): TrackedRange | undefined =>
     token ? readRange(view.state, token) : undefined;
 
   const capturedRange = (): { from: number; to: number } =>
